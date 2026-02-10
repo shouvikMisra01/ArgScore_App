@@ -1,112 +1,418 @@
 import os
 import json
-from typing import Dict, Any, List
+import traceback
+from typing import Dict, Any, List, Tuple
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
-# --- NEW GOOGLE LIBRARY (V2) ---
-from google import genai
-from google.genai import types
+# --- OPENAI LIBRARY ---
+from openai import OpenAI
+import httpx
+
+# --- Gemini (Commented Out) ---
+# from google import genai
+# from google.genai import types
 
 # Load env vars
 load_dotenv()
 
-app = FastAPI(title="ArgScore SaaS (Gemini V2)")
+app = FastAPI(title="ArgScore MVP v0.3")
 templates = Jinja2Templates(directory="templates")
 
-# --- Configuration ---
-API_KEY = os.getenv("GOOGLE_API_KEY")
-MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
+# --- Configuration (OpenAI) ---
+API_KEY = os.getenv("OPENAI_API_KEY")
+MODEL_NAME = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 if not API_KEY:
-    raise ValueError("Missing GOOGLE_API_KEY in .env file")
+    raise ValueError("Missing OPENAI_API_KEY in .env file")
 
 # Initialize Client
-client = genai.Client(api_key=API_KEY)
+http_client = httpx.Client()
+client = OpenAI(api_key=API_KEY, http_client=http_client)
 
-# --- Data Models ---
+# --- Gemini Configuration (Commented Out) ---
+# API_KEY = os.getenv("GOOGLE_API_KEY")
+# MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
+# if not API_KEY:
+#     raise ValueError("Missing GOOGLE_API_KEY in .env file")
+# client = genai.Client(api_key=API_KEY)
+
+
+# ============================================================
+# ArgScore MVP v0.3 Constants & Validators
+# ============================================================
+
+HARD_DIMENSIONS = [
+    "structure_validity",
+    "support_sufficiency",
+    "evidence_quality",
+    "causal_discipline",
+    "clarity_scope",
+    "counterarguments",
+    "uncertainty",
+]
+
+DEFAULT_WEIGHT_BOUNDS = {
+    "structure_validity":   [0.12, 0.20],
+    "support_sufficiency":  [0.10, 0.20],
+    "evidence_quality":     [0.10, 0.22],
+    "causal_discipline":    [0.08, 0.22],
+    "clarity_scope":        [0.06, 0.16],
+    "counterarguments":     [0.06, 0.18],
+    "uncertainty":          [0.06, 0.16],
+}
+
+DOMAIN_TAXONOMY = [
+    "physics", "engineering", "computer_science", "medicine", "biology",
+    "economics", "political_science", "sociology", "law", "public_policy",
+    "ethics", "philosophy", "business_strategy", "history", "journalism",
+    "general",
+]
+
+
+# --- Validators ---
+
+def die(msg: str, code: int = 500):
+    raise HTTPException(status_code=code, detail=msg)
+
+def clamp(x: float, lo: float, hi: float) -> float:
+    return max(lo, min(hi, x))
+
+def validate_weight_bounds(bounds: Dict[str, List[float]]) -> None:
+    for d in HARD_DIMENSIONS:
+        if d not in bounds:
+            die(f"allowed_weight_bounds missing dimension: {d}")
+        lo, hi = bounds[d]
+        if not (0 <= lo <= hi <= 1):
+            die(f"Invalid bounds for {d}: {bounds[d]}")
+    sum_mins = sum(bounds[d][0] for d in HARD_DIMENSIONS)
+    sum_maxs = sum(bounds[d][1] for d in HARD_DIMENSIONS)
+    if sum_mins > 1.0 + 1e-6:
+        die(f"Sum of min bounds > 1: {sum_mins}")
+    if sum_maxs < 1.0 - 1e-6:
+        die(f"Sum of max bounds < 1: {sum_maxs}")
+
+def validate_weights(weights: Dict[str, float], bounds: Dict[str, List[float]]) -> None:
+    """Clamp weights to bounds, then re-normalize to sum=1.0."""
+    did_clamp = False
+    for d in HARD_DIMENSIONS:
+        if d not in weights:
+            weights[d] = bounds[d][0]
+            did_clamp = True
+        w = float(weights[d])
+        lo, hi = bounds[d]
+        if w < lo:
+            weights[d] = lo
+            did_clamp = True
+        elif w > hi:
+            weights[d] = hi
+            did_clamp = True
+
+    # Re-normalize after clamping
+    s = sum(float(weights[d]) for d in HARD_DIMENSIONS)
+    if s <= 0:
+        die(f"Weights sum to non-positive value: {s}")
+    if did_clamp or abs(s - 1.0) > 1e-6:
+        for d in HARD_DIMENSIONS:
+            weights[d] = float(weights[d]) / s
+
+def validate_dimension_scores(scores: Dict[str, float]) -> None:
+    for d in HARD_DIMENSIONS:
+        if d not in scores:
+            scores[d] = 0.5  # Default instead of crash
+        v = float(scores[d])
+        scores[d] = clamp(v, 0.0, 1.0)
+
+def compute_final_score(weights: Dict[str, float], scores: Dict[str, float]) -> Tuple[float, float]:
+    raw = 0.0
+    for d in HARD_DIMENSIONS:
+        raw += float(weights[d]) * float(scores[d])
+    raw = clamp(raw, 0.0, 1.0)
+    score_1to10 = 1.0 + 9.0 * raw
+    score_1to10 = clamp(score_1to10, 1.0, 10.0)
+    return raw, score_1to10
+
+
+# ============================================================
+# Prompts (Full v0.3)
+# ============================================================
+
+SYSTEM_JSON_STRICT = (
+    "You are a precise evaluation engine. "
+    "You MUST output ONLY valid JSON. No markdown. No commentary."
+)
+
+def prompt_fact_gate(argument: str, numeric_tolerance: float) -> str:
+    return f"""
+TASK: FACT-CHECK GATE (FIRST, BLOCKING)
+
+IMPORTANT POLICY:
+- This gate is NOT allowed to block due to "unclear" claims.
+- This gate is NOT allowed to block due to normative/policy claims.
+- This gate may block ONLY due to contradicted factual/numeric claims that are critical.
+
+INPUT ARGUMENT:
+{argument}
+
+STEP 1: Extract claims
+Return a list of claims with:
+- id, text
+- type: factual | numeric | causal | normative | definition | prediction
+- verdict: supported | contradicted | unclear
+- confidence in [0,1]
+- criticality.centrality in [0,1]
+- criticality.sensitivity in [0,1]
+- numeric object only if type=numeric, else null
+
+Numeric tolerance:
+- tolerance = {numeric_tolerance:.2f}
+- relative_error = |claimed - checked| / max(|checked|, 1e-9)
+- within_tolerance = (relative_error <= tolerance)
+- material: true if the mismatch would meaningfully change the conclusion, otherwise false
+- If you cannot verify numeric truth value, set verdict="unclear" and numeric.checked_value=null
+
+STEP 2: Decide gate using ONLY these rules:
+
+Set gate="BLOCK" if and only if there exists at least one claim that satisfies:
+(A) claim.type in ["factual","numeric","definition","prediction","causal"]
+AND claim.verdict == "contradicted"
+AND (claim.criticality.centrality >= 0.6 OR claim.criticality.sensitivity >= 0.6)
+
+OR
+
+(B) claim.type == "numeric"
+AND claim.verdict == "contradicted"
+AND claim.numeric.relative_error > tolerance
+AND claim.numeric.material == true
+
+Otherwise gate="PASS".
+
+EXPLICIT FORBIDDEN BEHAVIOR:
+- You MUST NOT set gate="BLOCK" if all contradictions are absent.
+- You MUST NOT set gate="BLOCK" due to "unclear" claims.
+- You MUST NOT set gate="BLOCK" due to any "normative" claim.
+
+OUTPUT JSON SCHEMA:
+{{
+  "gate": "PASS" | "BLOCK",
+  "message": "Facts passed." | "Check your facts.",
+  "claims": [
+    {{
+      "id": "c1",
+      "text": "...",
+      "type": "factual|numeric|causal|normative|definition|prediction",
+      "verdict": "supported|contradicted|unclear",
+      "confidence": 0.0,
+      "criticality": {{"centrality": 0.0, "sensitivity": 0.0}},
+      "numeric": {{
+        "claimed_value": 0.0,
+        "checked_value": 0.0,
+        "unit": "",
+        "relative_error": 0.0,
+        "within_tolerance": true,
+        "material": false
+      }}
+    }}
+  ],
+  "notes": "short"
+}}
+
+IMPORTANT FORMATTING:
+- If claim is not numeric: numeric MUST be null.
+- checked_value can be null if unverifiable.
+- Only output valid JSON.
+"""
+
+def prompt_hard_domain(argument: str) -> str:
+    return f"""
+TASK: HARD RUBRIC ANALYSIS (STATIC)
+Determine:
+1) domain_primary from taxonomy
+2) domain_family
+3) argument_type
+4) question_type
+5) evidence_profile
+6) Create domain_packet with:
+   - allowed_weight_bounds (start from DEFAULT and adjust slightly for domain)
+   - required_domain_subtests (must attach to HARD_DIMENSIONS)
+
+ARGUMENT:
+{argument}
+
+DOMAIN TAXONOMY:
+{", ".join(DOMAIN_TAXONOMY)}
+
+DEFAULT WEIGHT BOUNDS:
+{json.dumps(DEFAULT_WEIGHT_BOUNDS, indent=2)}
+
+OUTPUT JSON:
+{{
+  "domain_primary": "economics",
+  "domain_family": "social_science|stem|law_policy|ethics_philosophy|business|history_media|general",
+  "confidence": 0.0,
+  "argument_type": "descriptive|causal|normative|prediction|definition|mixed",
+  "question_type": "descriptive|causal|normative|policy|prediction|mixed",
+  "evidence_profile": "anecdotal|observational_stats|experimental|theoretical|legal_precedent|mixed|none",
+  "signals": ["...","..."],
+  "domain_packet": {{
+    "allowed_weight_bounds": {{
+      "structure_validity":[0.0,0.0],
+      "support_sufficiency":[0.0,0.0],
+      "evidence_quality":[0.0,0.0],
+      "causal_discipline":[0.0,0.0],
+      "clarity_scope":[0.0,0.0],
+      "counterarguments":[0.0,0.0],
+      "uncertainty":[0.0,0.0]
+    }},
+    "required_domain_subtests": [
+      {{"parent":"evidence_quality","name":"..."}},
+      {{"parent":"causal_discipline","name":"..."}}
+    ]
+  }}
+}}
+
+CONSTRAINTS:
+- Sum(mins) <= 1 <= Sum(maxs)
+- Only output valid JSON.
+"""
+
+def prompt_soft_rubric(domain_packet: Dict[str, Any], argument: str) -> str:
+    return f"""
+TASK: GENERATE SOFT RUBRIC (DOMAIN-SPECIFIC) + SCORE ARGUMENT
+
+A) Generate weights within allowed bounds; sum to 1.0.
+B) Include required_domain_subtests (and optionally add more under HARD_DIMENSIONS).
+C) Score each hard dimension in [0,1].
+D) final score: score_1to10 = 1 + 9*sum(w*dscore)
+
+ARGUMENT:
+{argument}
+
+HARD DIMENSIONS:
+{json.dumps(HARD_DIMENSIONS, indent=2)}
+
+DOMAIN PACKET:
+{json.dumps(domain_packet, indent=2, ensure_ascii=False)}
+
+OUTPUT JSON:
+{{
+  "soft_rubric": {{
+    "domain": "economics",
+    "weights": {{
+      "structure_validity": 0.0,
+      "support_sufficiency": 0.0,
+      "evidence_quality": 0.0,
+      "causal_discipline": 0.0,
+      "clarity_scope": 0.0,
+      "counterarguments": 0.0,
+      "uncertainty": 0.0
+    }},
+    "domain_subtests": [
+      {{"parent":"evidence_quality","name":"...", "how_to_check":"short"}},
+      {{"parent":"causal_discipline","name":"...", "how_to_check":"short"}}
+    ]
+  }},
+  "dimension_scores": {{
+    "structure_validity": 0.0,
+    "support_sufficiency": 0.0,
+    "evidence_quality": 0.0,
+    "causal_discipline": 0.0,
+    "clarity_scope": 0.0,
+    "counterarguments": 0.0,
+    "uncertainty": 0.0
+  }},
+  "raw": 0.0,
+  "score_1to10": 0.0,
+  "top_strengths": [
+    {{"dim":"structure_validity","span":"...","reason":"..."}},
+    {{"dim":"clarity_scope","span":"...","reason":"..."}},
+    {{"dim":"uncertainty","span":"...","reason":"..."}}
+  ],
+  "top_weaknesses": [
+    {{"dim":"evidence_quality","span":"...","reason":"..."}},
+    {{"dim":"counterarguments","span":"...","reason":"..."}},
+    {{"dim":"causal_discipline","span":"...","reason":"..."}}
+  ],
+  "improvements": [
+    {{"action":"...", "expected_score_gain": 0.0}},
+    {{"action":"...", "expected_score_gain": 0.0}}
+  ]
+}}
+
+Only output valid JSON.
+"""
+
+
+# ============================================================
+# Chat Helper (OpenAI)
+# ============================================================
+
+def chat_json(system_instruction: str, user_message: str) -> Dict:
+    """Call OpenAI with JSON mode. Gemini version commented out below."""
+    try:
+        response = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": user_message}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.0
+        )
+        content = response.choices[0].message.content
+        return json.loads(content)
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=500, detail=f"AI returned invalid JSON: {str(e)}")
+    except Exception as e:
+        print(f"OpenAI Error: {e}")
+        tb = traceback.format_exc()
+        if "404" in str(e):
+            raise HTTPException(status_code=404, detail=f"Model '{MODEL_NAME}' not found.")
+        raise HTTPException(status_code=500, detail=f"AI Error: {str(e)}\n\nTraceback:\n{tb}")
+
+# --- Gemini chat_json (Commented Out) ---
+# def chat_json(system_instruction: str, user_message: str) -> Dict:
+#     try:
+#         response = client.models.generate_content(
+#             model=MODEL_NAME,
+#             contents=user_message,
+#             config=types.GenerateContentConfig(
+#                 system_instruction=system_instruction,
+#                 response_mime_type="application/json"
+#             )
+#         )
+#         return json.loads(response.text)
+#     except Exception as e:
+#         print(f"Gemini Error: {e}")
+#         if "404" in str(e):
+#             raise HTTPException(status_code=404, detail=f"Model '{MODEL_NAME}' not found.")
+#         raise HTTPException(status_code=500, detail=f"AI Error: {str(e)}")
+
+
+# ============================================================
+# Data Models
+# ============================================================
+
 class ArgumentRequest(BaseModel):
     text: str
     numeric_tolerance: float = 0.10
 
-# --- Helper: Chat with JSON Enforcement ---
-def chat_json(system_instruction: str, user_message: str) -> Dict:
-    try:
-        response = client.models.generate_content(
-            model=MODEL_NAME,
-            contents=user_message,
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                response_mime_type="application/json"
-            )
-        )
-        return json.loads(response.text)
-        
-    except Exception as e:
-        print(f"Gemini Error: {e}")
-        # If the model name is wrong, this helps us debug
-        if "404" in str(e):
-             raise HTTPException(status_code=404, detail=f"Model '{MODEL_NAME}' not found. Check your .env file.")
-        raise HTTPException(status_code=500, detail=f"AI Error: {str(e)}")
 
-# --- Prompts ---
-def get_fact_gate_prompt(text: str, tol: float):
-    return f"""
-    TASK: FACT-CHECK GATE.
-    INPUT: {text}
-    RULES: 
-    - Block ONLY if critical factual/numeric claims are CONTRADICTED.
-    - Do NOT block on 'unclear' or 'normative'.
-    - Tolerance: {tol}.
-    OUTPUT JSON schema: 
-    {{ "gate": "PASS"|"BLOCK", "message": "string", "claims": [{{ "text": "string", "verdict": "supported|contradicted" }}] }}
-    """
-
-def get_domain_prompt(text: str):
-    return f"""
-    TASK: HARD RUBRIC ANALYSIS.
-    INPUT: {text}
-    OUTPUT JSON schema: 
-    {{
-      "domain_primary": "string", 
-      "confidence": 0.0,
-      "domain_packet": {{ "allowed_weight_bounds": {{ "structure_validity": [0.1, 0.2] }} }}
-    }}
-    """
-
-def get_scoring_prompt(domain_data: Dict, text: str):
-    return f"""
-    TASK: SCORE ARGUMENT.
-    DOMAIN DATA: {json.dumps(domain_data)}
-    INPUT: {text}
-    OUTPUT JSON schema: 
-    {{
-      "dimension_scores": {{ "structure_validity": 0.0, "support_sufficiency": 0.0, "evidence_quality": 0.0, "causal_discipline": 0.0, "clarity_scope": 0.0, "counterarguments": 0.0, "uncertainty": 0.0 }},
-      "weights": {{ "structure_validity": 0.0, "support_sufficiency": 0.0, "evidence_quality": 0.0, "causal_discipline": 0.0, "clarity_scope": 0.0, "counterarguments": 0.0, "uncertainty": 0.0 }},
-      "top_strengths": [{{ "dim": "string", "reason": "string" }}],
-      "top_weaknesses": [{{ "dim": "string", "reason": "string" }}],
-      "improvements": [{{ "action": "string", "expected_score_gain": 0.0 }}]
-    }}
-    """
-
-# --- Routes ---
+# ============================================================
+# Routes
+# ============================================================
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
-# DEBUG ROUTE: Run this in browser /api/models to see what works
 @app.get("/api/models")
 async def list_models():
     try:
-        # Pager object iteration
-        model_list = []
-        for m in client.models.list():
-            model_list.append(m.name)
-        return {"available_models": model_list, "current_target": MODEL_NAME}
+        return {"available_models": [MODEL_NAME], "current_target": MODEL_NAME}
     except Exception as e:
         return {"error": str(e)}
 
@@ -115,44 +421,65 @@ async def analyze_argument(req: ArgumentRequest):
     if not req.text.strip():
         raise HTTPException(status_code=400, detail="Argument text is empty")
 
-    SYSTEM_PROMPT = "You are a precise evaluation engine. Output valid JSON."
+    # ── STAGE 1: Fact-Check Gate ──
+    gate_res = chat_json(SYSTEM_JSON_STRICT, prompt_fact_gate(req.text, req.numeric_tolerance))
 
-    # 1. Fact Gate
-    gate_res = chat_json(SYSTEM_PROMPT, get_fact_gate_prompt(req.text, req.numeric_tolerance))
-    if gate_res.get("gate") == "BLOCK":
+    gate = gate_res.get("gate")
+    if gate not in ("PASS", "BLOCK"):
+        raise HTTPException(status_code=500, detail=f"Fact gate returned invalid value: {gate}")
+
+    if gate == "BLOCK":
         return {
-            "status": "BLOCKED", 
-            "message": gate_res.get("message"), 
-            "claims": gate_res.get("claims")
+            "status": "BLOCKED",
+            "message": gate_res.get("message", "Check your facts."),
+            "claims": gate_res.get("claims", []),
+            "notes": gate_res.get("notes", "")
         }
 
-    # 2. Domain
-    domain_res = chat_json(SYSTEM_PROMPT, get_domain_prompt(req.text))
-    
-    # 3. Scoring
-    score_res = chat_json(SYSTEM_PROMPT, get_scoring_prompt(domain_res.get("domain_packet", {}), req.text))
+    # ── STAGE 2: Hard Rubric → Domain Packet ──
+    domain_res = chat_json(SYSTEM_JSON_STRICT, prompt_hard_domain(req.text))
 
-    # Calculate Score
-    dims = score_res.get("dimension_scores", {})
-    weights = score_res.get("weights", {})
-    
-    # Safety defaults
-    required_keys = ["structure_validity", "support_sufficiency", "evidence_quality", "causal_discipline", "clarity_scope", "counterarguments", "uncertainty"]
-    for k in required_keys:
-        if k not in dims: dims[k] = 0.5
-        if k not in weights: weights[k] = 1.0/7.0
+    domain_packet = domain_res.get("domain_packet")
+    if not isinstance(domain_packet, dict):
+        raise HTTPException(status_code=500, detail="AI produced invalid domain packet")
 
-    raw_score = sum(weights.get(k,0) * dims.get(k,0) for k in dims)
-    final_score = 1 + (9 * raw_score)
+    bounds = domain_packet.get("allowed_weight_bounds", {})
+    if not isinstance(bounds, dict) or len(bounds) == 0:
+        # Fallback to defaults if AI didn't produce valid bounds
+        bounds = DEFAULT_WEIGHT_BOUNDS
+        domain_packet["allowed_weight_bounds"] = bounds
+
+    validate_weight_bounds(bounds)
+
+    # ── STAGE 3: Soft Rubric + Scoring ──
+    score_res = chat_json(SYSTEM_JSON_STRICT, prompt_soft_rubric(domain_packet, req.text))
+
+    soft = score_res.get("soft_rubric", {})
+    weights = soft.get("weights", {})
+    dim_scores = score_res.get("dimension_scores", {})
+
+    if not isinstance(weights, dict):
+        raise HTTPException(status_code=500, detail="soft_rubric.weights missing or invalid")
+    if not isinstance(dim_scores, dict):
+        raise HTTPException(status_code=500, detail="dimension_scores missing or invalid")
+
+    # Validate + clamp + normalize
+    validate_weights(weights, bounds)
+    validate_dimension_scores(dim_scores)
+
+    # Compute final score (server-side, authoritative)
+    raw, final_score = compute_final_score(weights, dim_scores)
 
     return {
         "status": "SUCCESS",
         "domain": domain_res.get("domain_primary", "General"),
+        "confidence": float(domain_res.get("confidence", 0.0)),
         "final_score": round(final_score, 2),
-        "raw_score": round(raw_score, 3),
-        "dimension_scores": dims,
+        "raw_score": round(raw, 3),
+        "dimension_scores": dim_scores,
         "weights": weights,
         "strengths": score_res.get("top_strengths", []),
         "weaknesses": score_res.get("top_weaknesses", []),
-        "improvements": score_res.get("improvements", [])
+        "improvements": score_res.get("improvements", []),
+        "domain_subtests": soft.get("domain_subtests", [])
     }

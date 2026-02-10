@@ -1,36 +1,66 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ArgScore AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
     <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; }
-        
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
         /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #020617; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #020617;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
 
         /* Animations */
         @keyframes float {
-            0% { transform: translateY(0px); }
-            50% { transform: translateY(-10px); }
-            100% { transform: translateY(0px); }
+            0% {
+                transform: translateY(0px);
+            }
+
+            50% {
+                transform: translateY(-10px);
+            }
+
+            100% {
+                transform: translateY(0px);
+            }
         }
-        .animate-float { animation: float 6s ease-in-out infinite; }
-        
+
+        .animate-float {
+            animation: float 6s ease-in-out infinite;
+        }
+
         .fade-in-up {
             animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
             opacity: 0;
             transform: translateY(20px);
         }
-        
+
         @keyframes fadeInUp {
-            to { opacity: 1; transform: translateY(0); }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         /* Glass Cards */
@@ -41,8 +71,35 @@
             border: 1px solid rgba(255, 255, 255, 0.05);
         }
 
-        .score-circle { transition: stroke-dashoffset 1.5s cubic-bezier(0.2, 0, 0, 1); }
-        .bar-fill { transition: width 1.2s cubic-bezier(0.2, 0, 0, 1); }
+        .score-circle {
+            transition: stroke-dashoffset 1.5s cubic-bezier(0.2, 0, 0, 1);
+        }
+
+        .bar-fill {
+            transition: width 1.2s cubic-bezier(0.2, 0, 0, 1);
+        }
+
+        /* Slider styling */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 4px;
+            border-radius: 2px;
+            background: #334155;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #818cf8;
+            cursor: pointer;
+            border: 2px solid #1e1b4b;
+            box-shadow: 0 0 8px rgba(129, 140, 248, 0.4);
+        }
     </style>
     <script>
         tailwind.config = {
@@ -50,15 +107,17 @@
             theme: {
                 extend: {
                     colors: {
-                        background: '#020617', // Slate 950
-                        surface: '#0f172a',    // Slate 900
+                        background: '#020617',
+                        surface: '#0f172a',
                     }
                 }
             }
         }
     </script>
 </head>
-<body class="bg-background text-slate-200 min-h-screen selection:bg-indigo-500/30 selection:text-indigo-200 overflow-x-hidden">
+
+<body
+    class="bg-background text-slate-200 min-h-screen selection:bg-indigo-500/30 selection:text-indigo-200 overflow-x-hidden">
 
     <div class="fixed inset-0 z-0 pointer-events-none">
         <div class="absolute top-0 left-1/4 w-96 h-96 bg-indigo-600/20 rounded-full blur-[128px]"></div>
@@ -68,35 +127,44 @@
     <nav class="fixed w-full z-50 top-0 border-b border-white/5 bg-background/80 backdrop-blur-md">
         <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <div class="relative flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-tr from-indigo-500 to-purple-500 shadow-lg shadow-indigo-500/20">
+                <div
+                    class="relative flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-tr from-indigo-500 to-purple-500 shadow-lg shadow-indigo-500/20">
                     <span class="font-bold text-white">A</span>
                     <div class="absolute inset-0 rounded-lg ring-1 ring-inset ring-white/20"></div>
                 </div>
                 <span class="font-semibold text-lg tracking-tight text-white">ArgScore</span>
             </div>
             <div class="flex items-center gap-4">
-                <span class="px-2 py-1 rounded-md bg-white/5 text-[10px] font-mono text-slate-400 border border-white/5">BETA v1.4</span>
+                <span
+                    class="px-2 py-1 rounded-md bg-white/5 text-[10px] font-mono text-slate-400 border border-white/5">v0.3
+                    FULL</span>
             </div>
         </div>
     </nav>
 
     <main class="relative z-10 max-w-5xl mx-auto px-6 pt-32 pb-20">
-        
+
         <div class="text-center mb-12 fade-in-up" style="animation-delay: 0.1s;">
-            <h1 class="text-5xl md:text-6xl font-bold mb-6 tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-white via-slate-200 to-slate-500">
+            <h1
+                class="text-5xl md:text-6xl font-bold mb-6 tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-white via-slate-200 to-slate-500">
                 Grade Your Logic.
             </h1>
             <p class="text-slate-400 text-lg md:text-xl max-w-2xl mx-auto font-light leading-relaxed">
-                The AI-powered critical thinking engine. Detect fallacies, verify facts, and score your arguments instantly.
+                The AI-powered critical thinking engine. Detect fallacies, verify facts, and score your arguments
+                instantly.
             </p>
         </div>
 
         <div class="mb-12 fade-in-up" style="animation-delay: 0.2s;">
             <div class="relative group max-w-3xl mx-auto">
-                <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-2xl opacity-30 group-hover:opacity-100 transition duration-500 blur-sm group-focus-within:opacity-100"></div>
-                
-                <div class="relative bg-slate-900 rounded-2xl ring-1 ring-white/10">
-                    <div class="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-white/[0.02] rounded-t-2xl">
+                <div
+                    class="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-2xl opacity-30 group-hover:opacity-100 transition duration-500 blur-sm group-focus-within:opacity-100">
+                </div>
+
+                <div
+                    class="relative bg-slate-900 rounded-xl ring-1 ring-white/10 group-focus-within:ring-indigo-500/50 transition-all duration-300 shadow-xl">
+                    <div
+                        class="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-white/[0.02] rounded-t-xl">
                         <div class="flex gap-2">
                             <div class="w-3 h-3 rounded-full bg-slate-700"></div>
                             <div class="w-3 h-3 rounded-full bg-slate-700"></div>
@@ -105,11 +173,24 @@
                         <span class="text-xs font-mono text-slate-500">argument.txt</span>
                     </div>
 
-                    <textarea id="argInput" rows="8" 
-                        class="w-full bg-transparent p-6 text-lg text-slate-200 placeholder-slate-600 focus:outline-none resize-none font-medium leading-relaxed"
+                    <textarea id="argInput" rows="4"
+                        class="w-full bg-transparent p-4 text-lg text-slate-200 placeholder-slate-600 focus:outline-none resize-none font-medium leading-relaxed"
                         placeholder="Type or paste your argument here..."></textarea>
-                    
-                    <div class="flex items-center justify-between px-6 py-4 border-t border-white/5 bg-white/[0.02] rounded-b-2xl">
+
+                    <div class="px-6 py-3 border-t border-white/5 bg-white/[0.02]">
+                        <div class="flex items-center justify-between gap-4">
+                            <div class="flex items-center gap-3 flex-1">
+                                <span class="text-xs font-medium text-slate-500 whitespace-nowrap">Tolerance</span>
+                                <input type="range" id="toleranceSlider" min="0.01" max="0.50" step="0.01" value="0.10"
+                                    class="flex-1 max-w-[140px]"
+                                    oninput="document.getElementById('tolVal').textContent = this.value">
+                                <span id="tolVal" class="text-xs font-mono text-indigo-300 w-8 text-right">0.10</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div
+                        class="flex items-center justify-between px-6 py-4 border-t border-white/5 bg-white/[0.02] rounded-b-2xl">
                         <div class="flex items-center gap-2">
                             <span class="flex h-2 w-2 rounded-full bg-emerald-500"></span>
                             <span class="text-xs font-medium text-slate-400">Model Ready</span>
@@ -117,12 +198,18 @@
                         <button onclick="analyzeArgument()" id="analyzeBtn"
                             class="group relative inline-flex h-10 items-center justify-center overflow-hidden rounded-lg bg-indigo-600 px-8 font-medium text-white transition-all duration-300 hover:bg-indigo-500 hover:scale-105 hover:shadow-[0_0_20px_rgba(79,70,229,0.5)] focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-900">
                             <span class="mr-2">Analyze</span>
-                            <svg class="h-4 w-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                            <svg class="h-4 w-4 transition-transform group-hover:translate-x-1" fill="none"
+                                viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M13 7l5 5m0 0l-5 5m5-5H6" />
                             </svg>
-                            <svg id="spinner" class="hidden absolute right-3 h-4 w-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            <svg id="spinner" class="hidden absolute right-3 h-4 w-4 animate-spin text-white"
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                    stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                </path>
                             </svg>
                         </button>
                     </div>
@@ -133,22 +220,26 @@
         <div id="statusMessage" class="hidden max-w-3xl mx-auto mb-10 fade-in-up"></div>
 
         <div id="resultContainer" class="hidden space-y-8 fade-in-up" style="animation-delay: 0.1s;">
-            
+
             <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
-                
-                <div class="md:col-span-4 glass-card rounded-2xl p-8 flex flex-col items-center justify-center relative overflow-hidden">
-                    <div class="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-transparent pointer-events-none"></div>
-                    
+
+                <div
+                    class="md:col-span-4 glass-card rounded-2xl p-8 flex flex-col items-center justify-center relative overflow-hidden">
+                    <div
+                        class="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-transparent pointer-events-none">
+                    </div>
+
                     <div class="relative w-48 h-48">
                         <svg class="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
                             <circle cx="50" cy="50" r="40" fill="transparent" stroke="#1e293b" stroke-width="6" />
-                            <circle id="scoreCircle" cx="50" cy="50" r="40" fill="transparent" 
-                                stroke="currentColor" stroke-width="6" stroke-linecap="round" 
-                                stroke-dasharray="251.2" stroke-dashoffset="251.2" 
+                            <circle id="scoreCircle" cx="50" cy="50" r="40" fill="transparent" stroke="currentColor"
+                                stroke-width="6" stroke-linecap="round" stroke-dasharray="251.2"
+                                stroke-dashoffset="251.2"
                                 class="text-indigo-500 score-circle drop-shadow-[0_0_15px_rgba(99,102,241,0.6)]" />
                         </svg>
                         <div class="absolute inset-0 flex flex-col items-center justify-center">
-                            <span class="text-sm font-semibold text-slate-400 uppercase tracking-widest mb-1">Score</span>
+                            <span
+                                class="text-sm font-semibold text-slate-400 uppercase tracking-widest mb-1">Score</span>
                             <span id="finalScore" class="text-5xl font-bold text-white tracking-tighter">0.0</span>
                         </div>
                     </div>
@@ -157,11 +248,14 @@
                 <div class="md:col-span-8 glass-card rounded-2xl p-8 flex flex-col justify-center">
                     <div class="flex items-center gap-3 mb-6">
                         <div class="p-2 bg-indigo-500/10 rounded-lg border border-indigo-500/20">
-                            <svg class="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                            <svg class="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
                         </div>
                         <h3 class="text-lg font-semibold text-white">Analysis Context</h3>
                     </div>
-                    
+
                     <div class="space-y-4">
                         <div class="flex flex-wrap gap-4">
                             <div class="px-4 py-2 bg-slate-800/50 rounded-lg border border-slate-700/50">
@@ -169,12 +263,18 @@
                                 <span id="domainBadge" class="text-sm font-medium text-indigo-300">General</span>
                             </div>
                             <div class="px-4 py-2 bg-slate-800/50 rounded-lg border border-slate-700/50">
-                                <span class="text-xs text-slate-500 uppercase tracking-wide block mb-1">Rubric Type</span>
-                                <span class="text-sm font-medium text-emerald-300">Dynamic</span>
+                                <span
+                                    class="text-xs text-slate-500 uppercase tracking-wide block mb-1">Confidence</span>
+                                <span id="confidenceBadge" class="text-sm font-medium text-emerald-300">—</span>
+                            </div>
+                            <div class="px-4 py-2 bg-slate-800/50 rounded-lg border border-slate-700/50">
+                                <span class="text-xs text-slate-500 uppercase tracking-wide block mb-1">Rubric</span>
+                                <span class="text-sm font-medium text-purple-300">Dynamic v0.3</span>
                             </div>
                         </div>
                         <p class="text-slate-400 text-sm leading-relaxed border-l-2 border-slate-700 pl-4">
-                            This argument was evaluated against 7 key dimensions. Weights were automatically calibrated based on the detected domain to ensure fairness.
+                            Evaluated against 7 hard dimensions with domain-calibrated weights. Fact-checked before
+                            scoring.
                         </p>
                     </div>
                 </div>
@@ -183,7 +283,7 @@
             <div class="glass-card rounded-2xl p-8">
                 <h3 class="text-lg font-semibold text-white mb-6">Performance Breakdown</h3>
                 <div id="dimensionsList" class="grid grid-cols-1 gap-y-6">
-                    </div>
+                </div>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -207,7 +307,10 @@
             <div class="rounded-2xl p-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500">
                 <div class="bg-slate-900 rounded-xl p-8 h-full">
                     <h3 class="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                        <svg class="w-6 h-6 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        <svg class="w-6 h-6 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
                         Improvement Plan
                     </h3>
                     <div id="improvementsList" class="space-y-4"></div>
@@ -218,15 +321,15 @@
     </main>
 
     <script>
-       async function analyzeArgument() {
+        async function analyzeArgument() {
             const text = document.getElementById('argInput').value;
+            const tolerance = parseFloat(document.getElementById('toleranceSlider').value);
             const btn = document.getElementById('analyzeBtn');
             const spinner = document.getElementById('spinner');
             const resultContainer = document.getElementById('resultContainer');
             const statusMessage = document.getElementById('statusMessage');
 
             if (!text.trim()) {
-                // Shake effect for empty input
                 document.getElementById('argInput').parentElement.parentElement.classList.add('animate-pulse');
                 setTimeout(() => document.getElementById('argInput').parentElement.parentElement.classList.remove('animate-pulse'), 500);
                 return;
@@ -236,73 +339,34 @@
             resultContainer.classList.add('hidden');
             statusMessage.classList.add('hidden');
             btn.disabled = true;
-            btn.querySelector('span').classList.add('opacity-0'); // Hide text "Analyze"
+            btn.querySelector('span').classList.add('opacity-0');
             spinner.classList.remove('hidden');
 
             try {
                 const response = await fetch('/api/analyze', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: text })
+                    body: JSON.stringify({ text: text, numeric_tolerance: tolerance })
                 });
+
+                // Handle non-OK HTTP responses (500, 404, etc.)
+                if (!response.ok) {
+                    let errorDetail = `HTTP ${response.status}`;
+                    try {
+                        const errJson = await response.json();
+                        errorDetail = errJson.detail || JSON.stringify(errJson);
+                    } catch (e) {
+                        errorDetail = await response.text();
+                    }
+                    throw new Error(errorDetail);
+                }
 
                 const data = await response.json();
 
                 if (data.status === "BLOCKED") {
-                    // --- NEW: Detailed Block Logic ---
-                    
-                    // 1. Build list of claims
-                    let claimsHtml = '';
-                    if (data.claims && data.claims.length > 0) {
-                        claimsHtml = '<div class="mt-4 space-y-2 border-t border-rose-500/20 pt-4 flex flex-col gap-2">';
-                        claimsHtml += '<p class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-1">Evidence Analysis</p>';
-                        
-                        data.claims.forEach(claim => {
-                            // Style based on verdict
-                            const isContradicted = claim.verdict.toLowerCase().includes('contradicted');
-                            const icon = isContradicted 
-                                ? '<svg class="w-5 h-5 text-rose-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>'
-                                : '<svg class="w-5 h-5 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>';
-                            
-                            const bgClass = isContradicted ? 'bg-rose-500/10 border-rose-500/20' : 'bg-slate-800/30 border-white/5 opacity-70';
-                            const textClass = isContradicted ? 'text-rose-100 font-medium' : 'text-slate-400';
-                            const badgeClass = isContradicted ? 'text-rose-400' : 'text-emerald-400';
-
-                            claimsHtml += `
-                                <div class="flex gap-3 p-3 rounded-lg border ${bgClass} items-start text-left">
-                                    <div class="mt-0.5">${icon}</div>
-                                    <div>
-                                        <p class="${textClass} text-sm leading-snug">${claim.text}</p>
-                                        <span class="text-[10px] uppercase tracking-wide font-bold ${badgeClass}">${claim.verdict}</span>
-                                    </div>
-                                </div>
-                            `;
-                        });
-                        claimsHtml += '</div>';
-                    }
-
-                    // 2. Render the full card
-                    statusMessage.innerHTML = `
-                        <div class="p-6 bg-rose-950/40 text-rose-200 rounded-xl border border-rose-500/30 backdrop-blur-sm shadow-lg">
-                            <div class="flex items-center gap-3 mb-3">
-                                <div class="p-2 bg-rose-500/20 rounded-lg">
-                                    <svg class="w-6 h-6 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                                    </svg>
-                                </div>
-                                <div class="text-left">
-                                    <strong class="block text-lg text-rose-400 leading-none">Fact Gate Blocked</strong>
-                                    <span class="text-xs text-rose-300/60">Critical factual errors detected</span>
-                                </div>
-                            </div>
-                            <p class="text-rose-200/90 leading-relaxed text-left mb-2">${data.message}</p>
-                            ${claimsHtml}
-                        </div>`;
-                    statusMessage.classList.remove('hidden');
-
+                    renderBlocked(data);
                 } else if (data.status === "SUCCESS") {
                     renderResults(data);
-                    // Smooth scroll to results
                     setTimeout(() => {
                         resultContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     }, 100);
@@ -312,18 +376,99 @@
 
             } catch (error) {
                 statusMessage.innerHTML = `
-                    <div class="p-4 bg-amber-950/30 text-amber-300 border border-amber-500/30 rounded-lg backdrop-blur-sm">
-                        Error: ${error.message}
+                    <div class="p-6 bg-rose-950/30 text-rose-200 rounded-xl border border-rose-500/20 backdrop-blur-sm">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="p-2 bg-rose-500/20 rounded-lg">
+                                <svg class="w-5 h-5 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                            </div>
+                            <strong class="text-rose-400">Analysis Failed</strong>
+                        </div>
+                        <pre class="text-xs text-rose-300/80 whitespace-pre-wrap font-mono bg-rose-950/30 p-3 rounded-lg mt-2 max-h-48 overflow-y-auto">${error.message}</pre>
                     </div>`;
                 statusMessage.classList.remove('hidden');
             } finally {
-                // UI State: Reset
                 btn.disabled = false;
                 btn.querySelector('span').classList.remove('opacity-0');
                 spinner.classList.add('hidden');
             }
         }
-        
+
+        function renderBlocked(data) {
+            const statusMessage = document.getElementById('statusMessage');
+
+            let claimsHtml = '';
+            if (data.claims && data.claims.length > 0) {
+                claimsHtml = '<div class="mt-4 space-y-2 border-t border-rose-500/20 pt-4 flex flex-col gap-2">';
+                claimsHtml += '<p class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-1">Evidence Analysis</p>';
+
+                data.claims.forEach(claim => {
+                    const verdict = (claim.verdict || '').toLowerCase();
+                    const isContradicted = verdict.includes('contradicted');
+                    const isSupported = verdict.includes('supported');
+
+                    const icon = isContradicted
+                        ? '<svg class="w-5 h-5 text-rose-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>'
+                        : isSupported
+                            ? '<svg class="w-5 h-5 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>'
+                            : '<svg class="w-5 h-5 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>';
+
+                    const bgClass = isContradicted ? 'bg-rose-500/10 border-rose-500/20' : 'bg-slate-800/30 border-white/5 opacity-70';
+                    const textClass = isContradicted ? 'text-rose-100 font-medium' : 'text-slate-400';
+                    const badgeClass = isContradicted ? 'text-rose-400' : isSupported ? 'text-emerald-400' : 'text-amber-400';
+
+                    // Confidence + criticality info
+                    const conf = claim.confidence != null ? (claim.confidence * 100).toFixed(0) + '%' : '';
+                    const criticality = claim.criticality;
+                    let metaHtml = '';
+                    if (conf || criticality) {
+                        metaHtml = '<div class="flex gap-3 mt-1.5">';
+                        if (conf) metaHtml += `<span class="text-[10px] text-slate-500">Conf: ${conf}</span>`;
+                        if (criticality) {
+                            if (criticality.centrality != null) metaHtml += `<span class="text-[10px] text-slate-500">Central: ${(criticality.centrality * 100).toFixed(0)}%</span>`;
+                            if (criticality.sensitivity != null) metaHtml += `<span class="text-[10px] text-slate-500">Sensitive: ${(criticality.sensitivity * 100).toFixed(0)}%</span>`;
+                        }
+                        metaHtml += '</div>';
+                    }
+
+                    claimsHtml += `
+                        <div class="flex gap-3 p-3 rounded-lg border ${bgClass} items-start text-left">
+                            <div class="mt-0.5">${icon}</div>
+                            <div>
+                                <p class="${textClass} text-sm leading-snug">${claim.text}</p>
+                                <div class="flex items-center gap-2 mt-1">
+                                    <span class="text-[10px] uppercase tracking-wide font-bold ${badgeClass}">${claim.verdict}</span>
+                                    <span class="text-[10px] text-slate-600">${claim.type || ''}</span>
+                                </div>
+                                ${metaHtml}
+                            </div>
+                        </div>
+                    `;
+                });
+                claimsHtml += '</div>';
+            }
+
+            statusMessage.innerHTML = `
+                <div class="p-6 bg-rose-950/40 text-rose-200 rounded-xl border border-rose-500/30 backdrop-blur-sm shadow-lg">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="p-2 bg-rose-500/20 rounded-lg">
+                            <svg class="w-6 h-6 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                            </svg>
+                        </div>
+                        <div class="text-left">
+                            <strong class="block text-lg text-rose-400 leading-none">Fact Gate Blocked</strong>
+                            <span class="text-xs text-rose-300/60">Critical factual errors detected</span>
+                        </div>
+                    </div>
+                    <p class="text-rose-200/90 leading-relaxed text-left mb-2">${data.message}</p>
+                    ${data.notes ? `<p class="text-xs text-rose-300/50 italic mb-2">${data.notes}</p>` : ''}
+                    ${claimsHtml}
+                </div>`;
+            statusMessage.classList.remove('hidden');
+        }
+
         function renderResults(data) {
             const container = document.getElementById('resultContainer');
             container.classList.remove('hidden');
@@ -339,7 +484,7 @@
                 const elapsed = currentTime - startTime;
                 const progress = Math.min(elapsed / duration, 1);
                 const ease = 1 - Math.pow(1 - progress, 4);
-                
+
                 const currentVal = start + (end - start) * ease;
                 finalScoreEl.innerText = currentVal.toFixed(2);
 
@@ -355,28 +500,33 @@
             const offset = circumference - ((end / 10) * circumference);
 
             circle.setAttribute("class", "score-circle stroke-current drop-shadow-[0_0_15px_rgba(99,102,241,0.5)]");
-            
-            // Dynamic Colors
-            if(end < 5) circle.classList.add("text-rose-500");
-            else if(end < 7.5) circle.classList.add("text-amber-400");
-            else if(end < 9) circle.classList.add("text-emerald-400");
+
+            if (end < 5) circle.classList.add("text-rose-500");
+            else if (end < 7.5) circle.classList.add("text-amber-400");
+            else if (end < 9) circle.classList.add("text-emerald-400");
             else circle.classList.add("text-indigo-400");
 
             setTimeout(() => { circle.style.strokeDashoffset = offset; }, 200);
 
-            // Domain Badge
+            // Domain & Confidence Badges
             const dBadge = document.getElementById('domainBadge');
-            dBadge.innerText = data.domain || "General";
+            dBadge.innerText = (data.domain || "General").replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
             dBadge.className = "text-sm font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-400";
 
-            // --- 3. Dimension Bars (Bulletproof) ---
+            const cBadge = document.getElementById('confidenceBadge');
+            const conf = data.confidence != null ? (data.confidence * 100).toFixed(0) + '%' : '—';
+            cBadge.innerText = conf;
+
+            // --- 3. Dimension Bars with Weights ---
             const dimList = document.getElementById('dimensionsList');
             dimList.innerHTML = '';
 
             const scores = data.dimension_scores || {};
-            
+            const weights = data.weights || {};
+
             Object.entries(scores).forEach(([key, val]) => {
                 const percentage = (val * 100).toFixed(0);
+                const weight = weights[key] ? (weights[key] * 100).toFixed(1) : '?';
                 const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
                 const uniqueId = `bar-${key}`;
 
@@ -384,26 +534,29 @@
                 row.className = "group";
                 row.innerHTML = `
                     <div class="flex justify-between mb-2">
-                        <span class="text-sm font-medium text-slate-400 group-hover:text-indigo-300 transition-colors">${label}</span>
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm font-medium text-slate-400 group-hover:text-indigo-300 transition-colors">${label}</span>
+                            <span class="text-[10px] font-mono text-slate-600 bg-slate-800/50 px-1.5 py-0.5 rounded">w:${weight}%</span>
+                        </div>
                         <span class="text-sm font-bold text-slate-200">${percentage}%</span>
                     </div>
                     <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
-                        <div id="${uniqueId}" class="bar-fill h-full rounded-full bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 bg-[length:200%_100%] animate-shimmer" style="width: 0%"></div>
+                        <div id="${uniqueId}" class="bar-fill h-full rounded-full bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 bg-[length:200%_100%]" style="width: 0%"></div>
                     </div>
                 `;
                 dimList.appendChild(row);
 
                 setTimeout(() => {
                     const bar = document.getElementById(uniqueId);
-                    if(bar) bar.style.width = `${percentage}%`;
-                }, 150); 
+                    if (bar) bar.style.width = `${percentage}%`;
+                }, 150);
             });
 
             // --- 4. Lists ---
             const fillList = (id, items, type) => {
                 const el = document.getElementById(id);
                 el.innerHTML = '';
-                
+
                 if (!items || items.length === 0) {
                     el.innerHTML = '<li class="text-slate-600 italic text-sm">No significant items detected.</li>';
                     return;
@@ -426,10 +579,11 @@
                     } else {
                         const iconColor = type === 'weak' ? 'text-rose-400' : 'text-emerald-400';
                         const bullet = type === 'weak' ? '×' : '✓';
+                        const dim = item.dim ? `<span class="text-[10px] font-mono text-slate-600 ml-1">[${item.dim}]</span>` : '';
                         el.innerHTML += `
                             <li class="flex items-start gap-3 text-slate-300 text-sm leading-relaxed p-2 rounded-lg hover:bg-white/5 transition-colors">
                                 <span class="${iconColor} font-bold mt-0.5">${bullet}</span>
-                                <span>${item.reason}</span>
+                                <span>${item.reason}${dim}</span>
                             </li>`;
                     }
                 });
@@ -441,4 +595,5 @@
         }
     </script>
 </body>
+
 </html>
