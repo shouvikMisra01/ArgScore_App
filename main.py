@@ -542,4 +542,3 @@ async def analyze_argument(req: ArgumentRequest):
     })
 
     return response_data
-```
