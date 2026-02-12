@@ -11,6 +11,9 @@ from dotenv import load_dotenv
 # --- OPENAI LIBRARY ---
 from openai import OpenAI
 import httpx
+from datetime import datetime
+import pymongo
+from pymongo import MongoClient
 
 # --- Gemini (Commented Out) ---
 # from google import genai
@@ -39,6 +42,45 @@ client = OpenAI(api_key=API_KEY, http_client=http_client)
 # if not API_KEY:
 #     raise ValueError("Missing GOOGLE_API_KEY in .env file")
 # client = genai.Client(api_key=API_KEY)
+
+
+# ============================================================
+# MongoDB Configuration & Logging
+# ============================================================
+MONGO_URI = os.getenv("MONGO_URI")
+db_collection = None
+
+if MONGO_URI:
+    try:
+        mongo_client = MongoClient(MONGO_URI)
+        db = mongo_client.get_database("argscore_db")
+        db_collection = db.get_collection("analysis_logs")
+        print("Connected to MongoDB.")
+    except Exception as e:
+        print(f"Warning: Could not connect to MongoDB: {e}")
+else:
+    print("No MONGO_URI found. Logging to stdout only.")
+
+
+def log_attempt(data: Dict[str, Any]):
+    """Log analysis attempt to MongoDB or stdout."""
+    # Add timestamp
+    entry = {
+        "timestamp": datetime.utcnow(),
+        **data
+    }
+    
+    if db_collection is not None:
+        try:
+            db_collection.insert_one(entry)
+        except Exception as e:
+            print(f"Failed to log to MongoDB: {e}")
+    else:
+        # Fallback: Print to console (Render logs capture this)
+        # Convert datetime to string for JSON serialization in print
+        if "timestamp" in entry and isinstance(entry["timestamp"], datetime):
+            entry["timestamp"] = entry["timestamp"].isoformat()
+        print(f"LOG_ENTRY: {json.dumps(entry, default=str)}")
 
 
 # ============================================================
@@ -429,12 +471,20 @@ async def analyze_argument(req: ArgumentRequest):
         raise HTTPException(status_code=500, detail=f"Fact gate returned invalid value: {gate}")
 
     if gate == "BLOCK":
-        return {
+        result = {
             "status": "BLOCKED",
             "message": gate_res.get("message", "Check your facts."),
             "claims": gate_res.get("claims", []),
             "notes": gate_res.get("notes", "")
         }
+        # Log the blocked attempt
+        log_attempt({
+            "event": "analysis_blocked",
+            "input_text": req.text,
+            "numeric_tolerance": req.numeric_tolerance,
+            "result": result
+        })
+        return result
 
     # ── STAGE 2: Hard Rubric → Domain Packet ──
     domain_res = chat_json(SYSTEM_JSON_STRICT, prompt_hard_domain(req.text))
@@ -467,10 +517,9 @@ async def analyze_argument(req: ArgumentRequest):
     validate_weights(weights, bounds)
     validate_dimension_scores(dim_scores)
 
-    # Compute final score (server-side, authoritative)
     raw, final_score = compute_final_score(weights, dim_scores)
 
-    return {
+    response_data = {
         "status": "SUCCESS",
         "domain": domain_res.get("domain_primary", "General"),
         "confidence": float(domain_res.get("confidence", 0.0)),
@@ -483,3 +532,14 @@ async def analyze_argument(req: ArgumentRequest):
         "improvements": score_res.get("improvements", []),
         "domain_subtests": soft.get("domain_subtests", [])
     }
+
+    # Log the successful attempt
+    log_attempt({
+        "event": "analysis_success",
+        "input_text": req.text,
+        "numeric_tolerance": req.numeric_tolerance,
+        "result": response_data
+    })
+
+    return response_data
+```

@@ -5,3 +5,5 @@ requests
 jinja2
 openai
 httpx
+pymongo
+dnspython
